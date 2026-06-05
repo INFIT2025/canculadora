@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora IMC - INFIT | Tu mejor versión</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs (Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+    <!-- Confetti Effect -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        infit: {
+                            black: '#050505',
+                            dark: '#0a0a0a',
+                            gold: '#FFD700',
+                            golddim: '#B8860B',
+                            white: '#ffffff',
+                            gray: '#a3a3a3',
+                            cyan: '#06b6d4',
+                            green: '#22c55e',
+                            yellow: '#eab308',
+                            orange: '#f97316',
+                            red: '#ef4444',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        heading: ['Oswald', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                        'bounce-in': 'bounceIn 0.5s ease-out',
+                        'shimmer': 'shimmer 2s linear infinite',
+                        'fade-up': 'fadeUp 0.6s ease-out forwards',
+                        'scale-in': 'scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        glow: {
+                            '0%': { boxShadow: '0 0 20px rgba(255, 215, 0, 0.2)' },
+                            '100%': { boxShadow: '0 0 40px rgba(255, 215, 0, 0.4)' },
+                        },
+                        bounceIn: {
+                            '0%': { transform: 'scale(0.9)', opacity: '0' },
+                            '50%': { transform: 'scale(1.02)' },
+                            '100%': { transform: 'scale(1)', opacity: '1' },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-200% 0' },
+                            '100%': { backgroundPosition: '200% 0' },
+                        },
+                        fadeUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        },
+                        scaleIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.8)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #050505;
+            background-image: radial-gradient(circle at 50% 0%, #111 0%, #050505 70%);
+            color: #f5f5f5;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(15, 15, 15, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+        .input-field {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #333;
+            transition: all 0.3s ease;
+            color: white;
+        }
+        .input-field:focus {
+            border-color: #FFD700;
+            outline: none;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+        }
+        .input-field::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* BMI Gauge */
+        .gauge-container {
+            position: relative;
+            width: 280px;
+            height: 150px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+        .gauge-bg {
+            position: absolute;
+            width: 280px;
+            height: 280px;
+            border-radius: 50%;
+            background: conic-gradient(
+                from 180deg,
+                #06b6d4 0deg,
+                #22c55e 72deg,
+                #eab308 144deg,
+                #f97316 198deg,
+                #ef4444 252deg,
+                #ef4444 280deg
+            );
+            clip-path: polygon(0% 50%, 100% 50%, 100% 0%, 0% 0%);
+        }
+        .gauge-inner {
+            position: absolute;
+            width: 200px;
+            height: 200px;
+            top: 40px;
+            left: 40px;
+            border-radius: 50%;
+            background: #0a0a0a;
+            clip-path: polygon(0% 50%, 100% 50%, 100% 0%, 0% 0%);
+        }
+        .gauge-needle {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 4px;
+            height: 120px;
+            margin-left: -2px;
+            transform-origin: bottom center;
+            transform: rotate(-90deg);
+            transition: transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .gauge-needle::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-bottom: 100px solid #FFD700;
+            filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.5));
+        }
+        .gauge-needle::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 16px;
+            height: 16px;
+            background: #FFD700;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        /* Category colors */
+        .bmi-bajo { color: #06b6d4; }
+        .bmi-normal { color: #22c55e; }
+        .bmi-sobrepeso { color: #eab308; }
+        .bmi-obesidad1 { color: #f97316; }
+        .bmi-obesidad2 { color: #ef4444; }
+        .bmi-obesidad3 { color: #dc2626; }
+
+        .bmi-badge-bajo { background: rgba(6, 182, 212, 0.15); border-color: rgba(6, 182, 212, 0.3); color: #06b6d4; }
+        .bmi-badge-normal { background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.3); color: #22c55e; }
+        .bmi-badge-sobrepeso { background: rgba(234, 179, 8, 0.15); border-color: rgba(234, 179, 8, 0.3); color: #eab308; }
+        .bmi-badge-obesidad1 { background: rgba(249, 115, 22, 0.15); border-color: rgba(249, 115, 22, 0.3); color: #f97316; }
+        .bmi-badge-obesidad2 { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.3); color: #ef4444; }
+        .bmi-badge-obesidad3 { background: rgba(220, 38, 38, 0.15); border-color: rgba(220, 38, 38, 0.3); color: #dc2626; }
+
+        /* Unit toggle */
+        .unit-toggle {
+            position: relative;
+            display: inline-flex;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .unit-toggle label {
+            padding: 4px 12px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #888;
+        }
+        .unit-toggle input:checked + label {
+            background: #FFD700;
+            color: #000;
+            font-weight: bold;
+        }
+        .unit-toggle input {
+            display: none;
+        }
+
+        /* Country card */
+        .country-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        .country-card:hover {
+            transform: translateY(-2px);
+        }
+        .country-card.selected {
+            border-color: #FFD700 !important;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.15);
+        }
+        .country-card.selected .country-check {
+            display: flex;
+        }
+
+        /* Region cards */
+        .region-card {
+            transition: all 0.3s ease;
+        }
+        .region-card:hover {
+            transform: translateY(-4px);
+        }
+
+        /* Shimmer badge */
+        .shimmer-badge {
+            background: linear-gradient(90deg, #FFD700, #F59E0B, #FFD700);
+            background-size: 200% 100%;
+            animation: shimmer 2s linear infinite;
+            color: black;
+        }
+
+        /* Hidden by default */
+        #results-section { display: none; }
+        #cta-mexico { display: none; }
+        #cta-usa { display: none; }
+        #form-fields { display: none; }
+
+        .check-icon {
+            background: linear-gradient(135deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 215, 0, 0.1) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+        }
+
+        /* Validation error */
+        .field-error {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+        }
+
+        /* Feature pill */
+        .feature-pill {
+            background: linear-gradient(135deg, rgba(255,215,0,0.08) 0%, rgba(255,215,0,0.03) 100%);
+            border: 1px solid rgba(255,215,0,0.15);
+        }
+
+        /* WA button glow */
+        .wa-btn {
+            position: relative;
+            overflow: hidden;
+        }
+        .wa-btn::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .wa-btn:hover::after {
+            opacity: 1;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 215, 0, 0.5); border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans selection:bg-infit-gold selection:text-black">
+
+    <!-- Header -->
+    <nav class="fixed top-0 w-full z-50 glass-panel border-b border-white/5">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <i class="fas fa-bolt text-infit-gold text-xl animate-pulse-slow"></i>
+                <h1 class="text-2xl font-heading font-bold italic tracking-wider text-white">
+                    IN<span class="text-infit-gold">FIT</span>
+                </h1>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-[10px] text-infit-gold font-bold italic tracking-wider hidden sm:inline">Tu mejor versión</span>
+                <i class="fas fa-calculator text-infit-gold text-xs"></i>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="pt-28 pb-8 px-4 text-center max-w-4xl mx-auto relative">
+        <div class="absolute top-20 left-1/2 transform -translate-x-1/2 w-64 h-64 bg-infit-gold opacity-5 blur-[100px] rounded-full pointer-events-none"></div>
+        
+        <div class="inline-flex items-center gap-2 bg-infit-gold/10 border border-infit-gold/30 rounded-full px-4 py-2 mb-6">
+            <i class="fas fa-weight-scale text-infit-gold text-sm"></i>
+            <span class="text-white text-xs font-bold">Índice de Masa Corporal</span>
+        </div>
+        
+        <h2 class="text-3xl md:text-5xl font-heading font-bold uppercase italic mb-4 animate-float">
+            ¿Conoces tu<br>
+            <span class="text-infit-gold">IMC Real?</span>
+        </h2>
+        
+        <p class="text-gray-400 text-sm md:text-base mb-4 max-w-2xl mx-auto">
+            Tu Índice de Masa Corporal es el primer paso para entender dónde estás hoy. 
+            <span class="text-infit-gold font-bold">Conocer tu punto de partida es la clave para transformarte.</span>
+        </p>
+        <p class="text-gray-600 text-xs max-w-xl mx-auto">
+            Ingresa tus datos y descubre tu IMC. Es rápido, sencillo y completamente gratuito.
+        </p>
+    </header>
+
+    <!-- Country Selector -->
+    <section id="country-selector" class="max-w-lg mx-auto px-4 pb-6">
+        <div class="glass-panel rounded-2xl p-6">
+            <label class="block text-xs text-gray-500 uppercase font-bold mb-3 text-center">
+                <i class="fas fa-globe-americas text-infit-gold mr-1"></i>¿Dónde te encuentras?
+            </label>
+            <div class="grid grid-cols-2 gap-3">
+                <!-- Mexico -->
+                <div onclick="selectCountry('MX')" id="card-mx" class="country-card input-field rounded-xl p-4 text-center relative border-2 border-transparent">
+                    <div id="check-mx" class="country-check hidden absolute top-2 right-2 w-5 h-5 bg-infit-gold rounded-full items-center justify-center">
+                        <i class="fas fa-check text-black text-[10px]"></i>
+                    </div>
+                    <div class="text-3xl mb-2">🇲🇽</div>
+                    <p class="text-white font-bold text-sm">México</p>
+                    <p class="text-gray-500 text-[10px] mt-1">Santa Ana, Hidalgo y todo el país</p>
+                </div>
+                <!-- USA -->
+                <div onclick="selectCountry('US')" id="card-us" class="country-card input-field rounded-xl p-4 text-center relative border-2 border-transparent">
+                    <div id="check-us" class="country-check hidden absolute top-2 right-2 w-5 h-5 bg-infit-gold rounded-full items-center justify-center">
+                        <i class="fas fa-check text-black text-[10px]"></i>
+                    </div>
+                    <div class="text-3xl mb-2">🇺🇸</div>
+                    <p class="text-white font-bold text-sm">Estados Unidos</p>
+                    <p class="text-gray-500 text-[10px] mt-1">Paisanos en USA</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Calculator Form -->
+    <main id="form-fields" class="max-w-lg mx-auto px-4 pb-8">
+        <div class="glass-panel rounded-2xl p-6 md:p-8">
+            <form id="bmi-form" class="space-y-5" novalidate>
+                
+                <!-- Nombre -->
+                <div>
+                    <label class="block text-xs text-gray-500 uppercase font-bold mb-1">
+                        <i class="fas fa-user text-infit-gold mr-1"></i>Tu Nombre
+                    </label>
+                    <input type="text" id="user-name" class="input-field w-full rounded-lg p-3" placeholder="Ej. María García">
+                </div>
+
+                <!-- Género -->
+                <div>
+                    <label class="block text-xs text-gray-500 uppercase font-bold mb-2">
+                        <i class="fas fa-venus-mars text-infit-gold mr-1"></i>Género
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div onclick="selectGender('F')" id="gender-f-card" class="input-field p-3 rounded-lg text-center text-sm font-bold cursor-pointer hover:bg-white/5 transition-all border-2 border-transparent">
+                            <i class="fas fa-venus text-lg mb-1 block text-pink-400"></i> Mujer
+                        </div>
+                        <div onclick="selectGender('M')" id="gender-m-card" class="input-field p-3 rounded-lg text-center text-sm font-bold cursor-pointer hover:bg-white/5 transition-all border-2 border-transparent">
+                            <i class="fas fa-mars text-lg mb-1 block text-infit-gold"></i> Hombre
+                        </div>
+                    </div>
+                    <input type="hidden" id="user-gender" value="">
+                </div>
+
+                <!-- Edad -->
+                <div>
+                    <label class="block text-xs text-gray-500 uppercase font-bold mb-1">
+                        <i class="fas fa-cake-candles text-infit-gold mr-1"></i>Edad
+                    </label>
+                    <input type="number" id="user-age" class="input-field w-full rounded-lg p-3" placeholder="Ej. 28" min="12" max="99">
+                </div>
+
+                <!-- Estatura -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-gray-500 uppercase font-bold">
+                            <i class="fas fa-ruler-vertical text-infit-gold mr-1"></i>Estatura
+                        </label>
+                        <div class="unit-toggle">
+                            <input type="radio" name="height-unit" id="hu-cm" value="cm">
+                            <label for="hu-cm">cm</label>
+                            <input type="radio" name="height-unit" id="hu-ft" value="ft">
+                            <label for="hu-ft">ft/in</label>
+                        </div>
+                    </div>
+                    <div id="height-cm-wrap">
+                        <input type="number" id="user-height-cm" class="input-field w-full rounded-lg p-3" placeholder="Ej. 165" min="100" max="250">
+                    </div>
+                    <div id="height-ft-wrap" class="hidden grid grid-cols-2 gap-2">
+                        <input type="number" id="user-height-ft" class="input-field w-full rounded-lg p-3" placeholder="Pies (5)" min="3" max="8">
+                        <input type="number" id="user-height-in" class="input-field w-full rounded-lg p-3" placeholder="Pulgadas (6)" min="0" max="11">
+                    </div>
+                </div>
+
+                <!-- Peso -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs text-gray-500 uppercase font-bold">
+                            <i class="fas fa-weight-scale text-infit-gold mr-1"></i>Peso
+                        </label>
+                        <div class="unit-toggle">
+                            <input type="radio" name="weight-unit" id="wu-kg" value="kg">
+                            <label for="wu-kg">kg</label>
+                            <input type="radio" name="weight-unit" id="wu-lb" value="lb">
+                            <label for="wu-lb">lbs</label>
+                        </div>
+                    </div>
+                    <input type="number" id="user-weight" class="input-field w-full rounded-lg p-3" placeholder="Ej. 70" min="20" max="400" step="0.1">
+                    <p id="weight-unit-label" class="text-[10px] text-gray-600 mt-1">En kilogramos</p>
+                </div>
+
+                <!-- ¿Quién te recomendó? -->
+                <div class="border-t border-gray-800 pt-4">
+                    <label class="block text-xs text-gray-500 uppercase font-bold mb-1">
+                        <i class="fas fa-heart text-yellow-400 mr-1"></i>¿Quién te recomendó? (Opcional)
+                    </label>
+                    <input type="text" id="user-referrer" class="input-field w-full rounded-lg p-3" placeholder="Ej. Mi comadre Ana, Juan García...">
+                </div>
+
+                <!-- Validation message -->
+                <div id="validation-msg" class="hidden bg-red-900/20 border border-red-500/30 rounded-lg p-3 text-center">
+                    <p id="validation-text" class="text-red-400 text-xs font-bold"></p>
+                </div>
+
+                <!-- Submit -->
+                <button type="button" onclick="calculateBMI()" class="w-full bg-gradient-to-r from-infit-gold to-infit-golddim hover:from-yellow-400 hover:to-infit-gold text-black font-bold py-4 rounded-lg uppercase tracking-widest transition-all transform hover:scale-105 shadow-[0_0_20px_rgba(255,215,0,0.3)]">
+                    <i class="fas fa-calculator mr-2"></i>Calcular Mi IMC
+                </button>
+            </form>
+        </div>
+    </main>
+
+    <!-- Results Section -->
+    <section id="results-section" class="max-w-lg mx-auto px-4 pb-8">
+        <div class="glass-panel rounded-2xl p-6 md:p-8">
+            
+            <!-- Gauge -->
+            <div class="gauge-container mb-2">
+                <div class="gauge-bg"></div>
+                <div class="gauge-inner"></div>
+                <div id="gauge-needle" class="gauge-needle"></div>
+            </div>
+            
+            <!-- Gauge Labels -->
+            <div class="flex justify-between px-2 mb-4 -mt-2">
+                <span class="text-[9px] text-cyan-400">Bajo</span>
+                <span class="text-[9px] text-green-400">Normal</span>
+                <span class="text-[9px] text-yellow-400">Sobrepeso</span>
+                <span class="text-[9px] text-orange-400">Obesidad I</span>
+                <span class="text-[9px] text-red-400">Obesidad II+</span>
+            </div>
+
+            <!-- BMI Number -->
+            <div class="text-center mb-4">
+                <p class="text-gray-500 text-[10px] uppercase tracking-widest mb-1">Tu IMC</p>
+                <p id="bmi-value" class="text-6xl font-heading font-bold text-infit-gold">0.0</p>
+                <div id="bmi-category-badge" class="inline-block mt-3 px-4 py-1.5 rounded-full border text-sm font-bold uppercase tracking-wider">
+                    --
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div id="bmi-description" class="bg-white/5 rounded-xl p-4 mb-5 border border-white/10">
+                <p id="bmi-desc-text" class="text-sm text-gray-300 leading-relaxed"></p>
+            </div>
+
+            <!-- IMC Scale Reference -->
+            <div class="grid grid-cols-3 gap-2 mb-5">
+                <div class="text-center p-2 rounded-lg bg-cyan-900/10 border border-cyan-500/10">
+                    <p class="text-[10px] text-cyan-400 font-bold">Bajo peso</p>
+                    <p class="text-[9px] text-gray-500">&lt; 18.5</p>
+                </div>
+                <div class="text-center p-2 rounded-lg bg-green-900/10 border border-green-500/10">
+                    <p class="text-[10px] text-green-400 font-bold">Normal</p>
+                    <p class="text-[9px] text-gray-500">18.5 - 24.9</p>
+                </div>
+                <div class="text-center p-2 rounded-lg bg-yellow-900/10 border border-yellow-500/10">
+                    <p class="text-[10px] text-yellow-400 font-bold">Sobrepeso</p>
+                    <p class="text-[9px] text-gray-500">25 - 29.9</p>
+                </div>
+            </div>
+
+            <!-- CTA Message - personalized by result -->
+            <div id="bmi-cta-message" class="bg-gradient-to-r from-infit-gold/10 to-white/5 border border-infit-gold/20 rounded-xl p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <div class="bg-infit-gold/20 p-2 rounded-lg text-infit-gold flex-shrink-0 mt-0.5">
+                        <i class="fas fa-lightbulb"></i>
+                    </div>
+                    <div>
+                        <p id="bmi-cta-title" class="text-white font-bold text-sm mb-1"></p>
+                        <p id="bmi-cta-text" class="text-gray-400 text-xs leading-relaxed"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- What's included -->
+            <div class="bg-white/[0.03] border border-white/10 rounded-xl p-4 mb-4">
+                <p class="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-3 text-center">
+                    <i class="fas fa-star text-infit-gold mr-1"></i>Lo que incluye tu plan INFIT
+                </p>
+                <div class="space-y-2.5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-infit-gold/10 border border-infit-gold/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-mobile-screen text-infit-gold text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-white text-xs font-bold">App de alimentación personalizada</p>
+                            <p class="text-gray-500 text-[10px]">Plan adaptado 100% a ti, en tu celular</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-infit-gold/10 border border-infit-gold/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-bullseye text-infit-gold text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-white text-xs font-bold">Enfoque en tus objetivos</p>
+                            <p class="text-gray-500 text-[10px]">Bajar grasa, ganar masa, mantener tu peso</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-lg bg-infit-gold/10 border border-infit-gold/20 flex items-center justify-center flex-shrink-0">
+                            <i class="fab fa-whatsapp text-infit-gold text-xs"></i>
+                        </div>
+                        <div>
+                            <p class="text-white text-xs font-bold">Soporte por WhatsApp</p>
+                            <p class="text-gray-500 text-[10px]">Acompañamiento directo en tu proceso</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- L-Carnitina Mention -->
+            <div class="bg-cyan-900/10 border border-cyan-500/15 rounded-lg p-3">
+                <p class="text-[11px] text-cyan-300/70 leading-relaxed">
+                    <i class="fas fa-flask text-cyan-400/60 mr-1"></i>
+                    <strong class="text-cyan-300/90">Opción L-Carnitina:</strong> Potencia la quema de grasa y mejora tu rendimiento físico. Disponible como complemento con cualquier plan INFIT.
+                </p>
+            </div>
+
+            <!-- Slogan -->
+            <div class="text-center mt-4">
+                <p class="text-infit-gold/60 text-[10px] font-heading font-bold italic tracking-widest uppercase">Tu mejor versión</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Regional Section - MEXICO -->
+    <section id="cta-mexico" class="max-w-4xl mx-auto px-4 pb-8" style="display:none;">
+        
+        <div class="text-center mb-6">
+            <h3 class="text-2xl font-heading font-bold text-white uppercase italic mb-2">
+                <i class="fas fa-arrow-down text-infit-gold mr-2 animate-bounce"></i>
+                Da el siguiente paso
+            </h3>
+            <p class="text-gray-400 text-sm">Conocer tu IMC es el inicio. <span class="text-infit-gold font-bold">Tu mejor versión te espera.</span></p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            
+            <!-- Santa Ana Local -->
+            <div class="region-card glass-panel rounded-2xl p-5 border-t-2 border-infit-gold relative overflow-hidden hover:border-infit-gold/80">
+                <div class="absolute top-0 right-0 text-6xl opacity-[0.03] pointer-events-none">🇲🇽</div>
+                <div class="shimmer-badge inline-block px-3 py-1 rounded-full text-[9px] font-bold uppercase mb-3">
+                    📍 Santa Ana Local
+                </div>
+                <h4 class="font-heading font-bold text-white text-lg uppercase italic mb-2">Paisanos de Santa Ana</h4>
+                <p class="text-gray-500 text-xs mb-4 leading-relaxed">
+                    Planes de nutrición y entrenamiento con el sazón de nuestra tierra. Entrega directa en Santa Ana Hueytlalpan y alrededores.
+                </p>
+                <ul class="space-y-2 text-xs text-gray-400 mb-5">
+                    <li class="flex items-center gap-2">
+                        <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                        <span>Plan 100% personalizado</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                        <span>Enfoque en tus objetivos</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                        <span>Soporte por WhatsApp</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                        <span>Opción L-Carnitina para potenciar</span>
+                    </li>
+                </ul>
+                <button onclick="contactWhatsApp('santa-ana')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)]">
+                    <i class="fab fa-whatsapp text-lg"></i> Pide informes ahora
+                </button>
+            </div>
+
+            <!-- México General -->
+            <div class="region-card glass-panel rounded-2xl p-5 border-t-2 border-infit-gold/60 relative overflow-hidden hover:border-infit-gold/80">
+                <div class="absolute top-0 right-0 text-6xl opacity-[0.03] pointer-events-none">🇲🇽</div>
+                <div class="bg-infit-gold/10 border border-infit-gold/20 inline-block px-3 py-1 rounded-full text-[9px] font-bold uppercase mb-3 text-infit-gold">
+                    🇲🇽 México General
+                </div>
+                <h4 class="font-heading font-bold text-white text-lg uppercase italic mb-2">En todo México</h4>
+                <p class="text-gray-500 text-xs mb-4 leading-relaxed">
+                    Recibe tu plan personalizado en cualquier parte del país. Ingredientes accesibles en cualquier súper del país.
+                </p>
+                <ul class="space-y-2 text-xs text-gray-400 mb-5">
+                    <li class="flex items-center gap-2">
+                        <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                        <span>Plan 100% personalizado</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                        <span>Enfoque en tus objetivos</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                        <span>Soporte por WhatsApp</span>
+                    </li>
+                    <li class="flex items-center gap-2">
+                        <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                        <span>Opción L-Carnitina para potenciar</span>
+                    </li>
+                </ul>
+                <button onclick="contactWhatsApp('mexico')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)]">
+                    <i class="fab fa-whatsapp text-lg"></i> Pide informes ahora
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Regional Section - USA -->
+    <section id="cta-usa" class="max-w-lg mx-auto px-4 pb-8" style="display:none;">
+        
+        <div class="text-center mb-6">
+            <h3 class="text-2xl font-heading font-bold text-white uppercase italic mb-2">
+                <i class="fas fa-arrow-down text-infit-gold mr-2 animate-bounce"></i>
+                Da el siguiente paso
+            </h3>
+            <p class="text-gray-400 text-sm">Conocer tu IMC es el inicio. <span class="text-infit-gold font-bold">Tu mejor versión te espera.</span></p>
+        </div>
+
+        <div class="region-card glass-panel rounded-2xl p-5 border-t-2 border-gray-600 relative overflow-hidden hover:border-gray-500">
+            <div class="absolute top-0 right-0 text-6xl text-white opacity-[0.03] pointer-events-none">🇺🇸</div>
+            <div class="bg-white/5 border border-gray-700 inline-block px-3 py-1 rounded-full text-[9px] font-bold uppercase mb-3 text-gray-400">
+                🇺🇸 Paisanos en USA
+            </div>
+            <h4 class="font-heading font-bold text-white text-lg uppercase italic mb-2">Paisanos en EE.UU.</h4>
+            <p class="text-gray-500 text-xs mb-4 leading-relaxed">
+                Desde lejos pero conectados con tu bienestar. Planes adaptados con ingredientes que encuentras en cualquier tienda en USA.
+            </p>
+            <ul class="space-y-2 text-xs text-gray-400 mb-5">
+                <li class="flex items-center gap-2">
+                    <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                    <span>Plan 100% personalizado</span>
+                </li>
+                <li class="flex items-center gap-2">
+                    <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                    <span>Enfoque en tus objetivos</span>
+                </li>
+                <li class="flex items-center gap-2">
+                    <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                    <span>Soporte por WhatsApp</span>
+                </li>
+                <li class="flex items-center gap-2">
+                    <div class="check-icon p-1 rounded text-infit-gold"><i class="fas fa-check text-[10px]"></i></div>
+                    <span>Opción L-Carnitina para potenciar</span>
+                </li>
+            </ul>
+            <button onclick="contactWhatsApp('usa')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)]">
+                <i class="fab fa-whatsapp text-lg"></i> Pide informes ahora
+            </button>
+        </div>
+    </section>
+
+    <!-- Info Section -->
+    <section class="max-w-4xl mx-auto px-4 pb-8">
+        <div class="glass-panel rounded-2xl p-6">
+            <h3 class="text-lg font-heading font-bold text-center text-white uppercase italic mb-4">
+                <i class="fas fa-circle-info text-infit-gold mr-2"></i>¿Qué es el IMC?
+            </h3>
+            <p class="text-gray-400 text-sm leading-relaxed text-center max-w-2xl mx-auto mb-4">
+                El Índice de Masa Corporal (IMC) es una medida que relaciona tu peso con tu estatura. 
+                Es un indicador útil para identificar si tu peso se encuentra en un rango saludable, 
+                aunque <span class="text-infit-gold font-bold">no distingue entre masa muscular y grasa</span>, 
+                por lo que es solo una referencia inicial.
+            </p>
+            <div class="grid grid-cols-2 md:grid-cols-6 gap-2 text-center">
+                <div class="p-2 rounded-lg bg-cyan-900/10 border border-cyan-500/10">
+                    <p class="text-[9px] text-cyan-400 font-bold">Bajo peso</p>
+                    <p class="text-[8px] text-gray-500">&lt; 18.5</p>
+                </div>
+                <div class="p-2 rounded-lg bg-green-900/10 border border-green-500/10">
+                    <p class="text-[9px] text-green-400 font-bold">Normal</p>
+                    <p class="text-[8px] text-gray-500">18.5 - 24.9</p>
+                </div>
+                <div class="p-2 rounded-lg bg-yellow-900/10 border border-yellow-500/10">
+                    <p class="text-[9px] text-yellow-400 font-bold">Sobrepeso</p>
+                    <p class="text-[8px] text-gray-500">25 - 29.9</p>
+                </div>
+                <div class="p-2 rounded-lg bg-orange-900/10 border border-orange-500/10">
+                    <p class="text-[9px] text-orange-400 font-bold">Obesidad I</p>
+                    <p class="text-[8px] text-gray-500">30 - 34.9</p>
+                </div>
+                <div class="p-2 rounded-lg bg-red-900/10 border border-red-500/10">
+                    <p class="text-[9px] text-red-400 font-bold">Obesidad II</p>
+                    <p class="text-[8px] text-gray-500">35 - 39.9</p>
+                </div>
+                <div class="p-2 rounded-lg bg-red-900/15 border border-red-500/15">
+                    <p class="text-[9px] text-red-500 font-bold">Obesidad III</p>
+                    <p class="text-[8px] text-gray-500">&ge; 40</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-black py-8 border-t border-gray-900 mt-auto">
+        <div class="text-center">
+            <p class="text-infit-gold font-heading font-bold text-xl italic tracking-widest">IN<span class="text-white">FIT</span></p>
+            <p class="text-gray-600 text-[10px] italic tracking-wider mt-1">Tu mejor versión</p>
+            <p class="text-gray-700 text-[10px] uppercase tracking-widest mt-1">Santa Ana Hueytlalpan · Hidalgo · México</p>
+        </div>
+    </footer>
+
+    <script>
+        // ==========================================
+        //  FIREBASE
+        // ==========================================
+        let db;
+        let auth;
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyAQGBdxeLXvFrhGSgOvDpJbswbeJ3Fi48Y",
+            authDomain: "infit-bienvenida-mx.firebaseapp.com",
+            projectId: "infit-bienvenida-mx",
+            storageBucket: "infit-bienvenida-mx.firebasestorage.app",
+            messagingSenderId: "204458486575",
+            appId: "1:204458486575:web:57a2a7b62053cd33afcfda"
+        };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'infit-web';
+
+        try {
+            if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                auth = firebase.auth();
+                auth.signInAnonymously().catch(e => console.error("Auth Error", e));
+            }
+        } catch (e) { console.warn("Firebase offline", e); }
+
+        // ==========================================
+        //  STATE
+        // ==========================================
+        let bmiResult = null;
+        let bmiCategory = null;
+        let affiliateCode = null;
+        let selectedCountry = null; // 'MX' or 'US'
+        let selectedGender = null;  // 'F' or 'M'
+
+        // ==========================================
+        //  INIT
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const ref = urlParams.get('ref');
+            if (ref) {
+                affiliateCode = ref;
+                document.getElementById('user-referrer').value = ref;
+            }
+
+            // Height unit toggle
+            document.querySelectorAll('input[name="height-unit"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    if (e.target.value === 'cm') {
+                        document.getElementById('height-cm-wrap').classList.remove('hidden');
+                        document.getElementById('height-ft-wrap').classList.add('hidden');
+                    } else {
+                        document.getElementById('height-cm-wrap').classList.add('hidden');
+                        document.getElementById('height-ft-wrap').classList.remove('hidden');
+                    }
+                });
+            });
+
+            // Weight unit label
+            document.querySelectorAll('input[name="weight-unit"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const label = document.getElementById('weight-unit-label');
+                    if (e.target.value === 'kg') {
+                        label.textContent = 'En kilogramos';
+                        document.getElementById('user-weight').placeholder = 'Ej. 70';
+                    } else {
+                        label.textContent = 'En libras';
+                        document.getElementById('user-weight').placeholder = 'Ej. 154';
+                    }
+                });
+            });
+
+            // Enter key
+            document.getElementById('bmi-form').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    calculateBMI();
+                }
+            });
+        });
+
+        // ==========================================
+        //  COUNTRY SELECTOR
+        // ==========================================
+        function selectCountry(country) {
+            selectedCountry = country;
+            
+            document.getElementById('card-mx').classList.remove('selected');
+            document.getElementById('card-us').classList.remove('selected');
+            document.getElementById('check-mx').classList.add('hidden');
+            document.getElementById('check-us').classList.add('hidden');
+            
+            if (country === 'MX') {
+                document.getElementById('card-mx').classList.add('selected');
+                document.getElementById('check-mx').classList.remove('hidden');
+                document.getElementById('check-mx').style.display = 'flex';
+                document.getElementById('hu-cm').checked = true;
+                document.getElementById('hu-ft').checked = false;
+                document.getElementById('wu-kg').checked = true;
+                document.getElementById('wu-lb').checked = false;
+                document.getElementById('height-cm-wrap').classList.remove('hidden');
+                document.getElementById('height-ft-wrap').classList.add('hidden');
+                document.getElementById('weight-unit-label').textContent = 'En kilogramos';
+                document.getElementById('user-weight').placeholder = 'Ej. 70';
+            } else {
+                document.getElementById('card-us').classList.add('selected');
+                document.getElementById('check-us').classList.remove('hidden');
+                document.getElementById('check-us').style.display = 'flex';
+                document.getElementById('hu-cm').checked = false;
+                document.getElementById('hu-ft').checked = true;
+                document.getElementById('wu-kg').checked = false;
+                document.getElementById('wu-lb').checked = true;
+                document.getElementById('height-cm-wrap').classList.add('hidden');
+                document.getElementById('height-ft-wrap').classList.remove('hidden');
+                document.getElementById('weight-unit-label').textContent = 'En libras';
+                document.getElementById('user-weight').placeholder = 'Ej. 154';
+            }
+
+            document.getElementById('form-fields').style.display = 'block';
+            document.getElementById('results-section').style.display = 'none';
+            document.getElementById('cta-mexico').style.display = 'none';
+            document.getElementById('cta-usa').style.display = 'none';
+
+            setTimeout(() => {
+                document.getElementById('form-fields').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 200);
+        }
+
+        // ==========================================
+        //  GENDER SELECTOR
+        // ==========================================
+        function selectGender(gender) {
+            selectedGender = gender;
+            document.getElementById('user-gender').value = gender;
+            
+            const fCard = document.getElementById('gender-f-card');
+            const mCard = document.getElementById('gender-m-card');
+            
+            fCard.style.borderColor = 'transparent';
+            mCard.style.borderColor = 'transparent';
+            fCard.style.boxShadow = 'none';
+            mCard.style.boxShadow = 'none';
+            
+            if (gender === 'F') {
+                fCard.style.borderColor = '#ec4899';
+                fCard.style.boxShadow = '0 0 12px rgba(236, 72, 153, 0.2)';
+            } else {
+                mCard.style.borderColor = '#FFD700';
+                mCard.style.boxShadow = '0 0 12px rgba(255, 215, 0, 0.2)';
+            }
+        }
+
+        // ==========================================
+        //  VALIDATION
+        // ==========================================
+        function showValidationError(msg) {
+            const el = document.getElementById('validation-msg');
+            const txt = document.getElementById('validation-text');
+            txt.textContent = msg;
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 4000);
+        }
+
+        // ==========================================
+        //  BMI CALCULATION
+        // ==========================================
+        function calculateBMI() {
+            document.getElementById('validation-msg').classList.add('hidden');
+
+            if (!selectedCountry) {
+                showValidationError('Selecciona dónde te encuentras (México o Estados Unidos).');
+                return;
+            }
+
+            const name = document.getElementById('user-name').value.trim();
+            const gender = selectedGender;
+            const ageVal = document.getElementById('user-age').value;
+            const referrer = document.getElementById('user-referrer').value.trim();
+
+            if (!name) {
+                showValidationError('Ingresa tu nombre para continuar.');
+                document.getElementById('user-name').classList.add('field-error');
+                setTimeout(() => document.getElementById('user-name').classList.remove('field-error'), 3000);
+                return;
+            }
+
+            if (!gender) {
+                showValidationError('Selecciona tu género (Mujer u Hombre).');
+                return;
+            }
+
+            const age = parseInt(ageVal);
+            if (!ageVal || isNaN(age) || age < 12 || age > 99) {
+                showValidationError('Ingresa una edad válida (12-99).');
+                document.getElementById('user-age').classList.add('field-error');
+                setTimeout(() => document.getElementById('user-age').classList.remove('field-error'), 3000);
+                return;
+            }
+
+            // Get height in cm
+            let heightCm;
+            const heightUnit = document.querySelector('input[name="height-unit"]:checked')?.value || 'cm';
+            if (heightUnit === 'cm') {
+                heightCm = parseFloat(document.getElementById('user-height-cm').value);
+                if (!heightCm || isNaN(heightCm) || heightCm < 100 || heightCm > 250) {
+                    showValidationError('Ingresa una estatura válida en cm (100-250).');
+                    document.getElementById('user-height-cm').classList.add('field-error');
+                    setTimeout(() => document.getElementById('user-height-cm').classList.remove('field-error'), 3000);
+                    return;
+                }
+            } else {
+                const ft = parseFloat(document.getElementById('user-height-ft').value);
+                const inches = parseFloat(document.getElementById('user-height-in').value) || 0;
+                if (!ft || isNaN(ft) || ft < 3 || ft > 8) {
+                    showValidationError('Ingresa una estatura válida en pies (3-8).');
+                    document.getElementById('user-height-ft').classList.add('field-error');
+                    setTimeout(() => document.getElementById('user-height-ft').classList.remove('field-error'), 3000);
+                    return;
+                }
+                heightCm = (ft * 12 + inches) * 2.54;
+            }
+
+            // Get weight in kg
+            let weightKg;
+            const weightUnit = document.querySelector('input[name="weight-unit"]:checked')?.value || 'kg';
+            const rawWeight = parseFloat(document.getElementById('user-weight').value);
+            if (!rawWeight || isNaN(rawWeight) || rawWeight < 20 || rawWeight > 400) {
+                showValidationError('Ingresa un peso válido.');
+                document.getElementById('user-weight').classList.add('field-error');
+                setTimeout(() => document.getElementById('user-weight').classList.remove('field-error'), 3000);
+                return;
+            }
+            weightKg = weightUnit === 'kg' ? rawWeight : rawWeight * 0.453592;
+
+            // Calculate BMI
+            const heightM = heightCm / 100;
+            const bmi = weightKg / (heightM * heightM);
+            bmiResult = Math.round(bmi * 10) / 10;
+
+            // Determine category
+            if (bmiResult < 18.5) bmiCategory = 'bajo';
+            else if (bmiResult < 25) bmiCategory = 'normal';
+            else if (bmiResult < 30) bmiCategory = 'sobrepeso';
+            else if (bmiResult < 35) bmiCategory = 'obesidad1';
+            else if (bmiResult < 40) bmiCategory = 'obesidad2';
+            else bmiCategory = 'obesidad3';
+
+            // Save to Firebase
+            const formData = {
+                name: name,
+                gender: gender,
+                age: age,
+                heightCm: Math.round(heightCm),
+                weightKg: Math.round(weightKg * 10) / 10,
+                bmi: bmiResult,
+                bmiCategory: bmiCategory,
+                country: selectedCountry,
+                referredBy: referrer || 'Orgánico',
+                affiliate: affiliateCode || null,
+                source: 'imc-calculadora',
+                timestamp: new Date().toISOString()
+            };
+
+            if (db) {
+                try {
+                    const user = auth.currentUser;
+                    if (user) {
+                        db.collection('artifacts').doc(appId).collection('public').doc('data').collection('leads').add(formData)
+                            .then(() => console.log("Lead guardado"))
+                            .catch(err => console.error("Error al guardar:", err));
+                    }
+                } catch (error) { console.error("Error Firebase:", error); }
+            }
+
+            showResults(bmiResult, bmiCategory, name, gender);
+        }
+
+        // ==========================================
+        //  SHOW RESULTS
+        // ==========================================
+        function showResults(bmi, category, name, gender) {
+            document.getElementById('results-section').style.display = 'block';
+
+            // Show correct CTA based on country
+            if (selectedCountry === 'MX') {
+                document.getElementById('cta-mexico').style.display = 'block';
+                document.getElementById('cta-usa').style.display = 'none';
+            } else {
+                document.getElementById('cta-mexico').style.display = 'none';
+                document.getElementById('cta-usa').style.display = 'block';
+            }
+
+            // Animate gauge needle
+            const needle = document.getElementById('gauge-needle');
+            const angle = bmiToAngle(bmi);
+            needle.style.transition = 'none';
+            needle.style.transform = 'rotate(-90deg)';
+            void needle.offsetWidth;
+            needle.style.transition = 'transform 1.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            needle.style.transform = `rotate(${angle}deg)`;
+
+            // Animate BMI number
+            animateNumber('bmi-value', 0, bmi, 1200);
+
+            // Category badge
+            const badge = document.getElementById('bmi-category-badge');
+            const categoryInfo = getCategoryInfo(category);
+            badge.textContent = categoryInfo.label;
+            badge.className = `inline-block mt-3 px-4 py-1.5 rounded-full border text-sm font-bold uppercase tracking-wider bmi-badge-${category}`;
+
+            // Description
+            document.getElementById('bmi-desc-text').innerHTML = categoryInfo.description(gender);
+
+            // CTA message personalized by result
+            document.getElementById('bmi-cta-title').textContent = categoryInfo.ctaTitle;
+            document.getElementById('bmi-cta-text').innerHTML = categoryInfo.ctaText;
+
+            // Confetti for normal
+            if (category === 'normal') {
+                setTimeout(() => {
+                    try {
+                        canvasConfetti({
+                            particleCount: 80,
+                            spread: 60,
+                            origin: { y: 0.7 },
+                            colors: ['#22c55e', '#FFD700', '#ffffff']
+                        });
+                    } catch(e) {}
+                }, 600);
+            }
+
+            setTimeout(() => {
+                document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 300);
+        }
+
+        // ==========================================
+        //  BMI TO GAUGE ANGLE
+        // ==========================================
+        function bmiToAngle(bmi) {
+            const clamped = Math.max(15, Math.min(45, bmi));
+            const normalized = (clamped - 15) / 30;
+            return -90 + (normalized * 180);
+        }
+
+        // ==========================================
+        //  ANIMATE NUMBER
+        // ==========================================
+        function animateNumber(elementId, start, end, duration) {
+            const el = document.getElementById(elementId);
+            const startTime = performance.now();
+            
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = start + (end - start) * eased;
+                el.textContent = current.toFixed(1);
+                if (progress < 1) requestAnimationFrame(update);
+            }
+            requestAnimationFrame(update);
+        }
+
+        // ==========================================
+        //  CATEGORY INFO (with "Tu mejor versión" slogan)
+        // ==========================================
+        function getCategoryInfo(category) {
+            const info = {
+                bajo: {
+                    label: 'Bajo Peso',
+                    description: (g) => `Tu IMC indica que te encuentras por debajo del rango saludable. Esto puede significar que tu cuerpo no está recibiendo los nutrientes suficientes, lo cual puede afectar tu energía, defensas y masa muscular. <span class="text-cyan-400 font-bold">Un plan de nutrición personalizado puede ayudarte a alcanzar tu peso ideal</span> de forma saludable y sostenible.`,
+                    ctaTitle: 'Tu cuerpo merece más',
+                    ctaText: 'Con la app de alimentación personalizada INFIT y un plan adaptado a ti, puedes ganar masa muscular y energía de forma saludable. <strong class="text-infit-gold">Opción a L-Carnitina para potenciar tus resultados.</strong> ¡Pide informes y logra tu mejor versión!'
+                },
+                normal: {
+                    label: 'Peso Normal',
+                    description: (g) => `¡Felicitaciones! Tu IMC se encuentra en el rango saludable. Esto es una excelente base, pero recuerda que el IMC no distingue entre masa muscular y grasa. <span class="text-green-400 font-bold">Mantener tu forma requiere constancia y un plan adaptado a tu estilo de vida.</span> Un plan de nutrición y entrenamiento te ayuda a mantener y mejorar.`,
+                    ctaTitle: 'Sigue por el buen camino',
+                    ctaText: 'Estás en un gran punto de partida. Con la app de alimentación personalizada INFIT puedes mantener tu peso, definir tu figura y sentirte aún mejor. <strong class="text-infit-gold">Opción a L-Carnitina para potenciar tus resultados.</strong> ¡Tu mejor versión sigue en camino!'
+                },
+                sobrepeso: {
+                    label: 'Sobrepeso',
+                    description: (g) => `Tu IMC indica sobrepeso, lo que significa que estás ligeramente por encima del rango saludable. Esto es más común de lo que piensas y <span class="text-yellow-400 font-bold">pequeños cambios pueden hacer una gran diferencia</span>. Un plan personalizado de alimentación y actividad física es la clave para volver a tu mejor versión.`,
+                    ctaTitle: 'Pequeños cambios, grandes resultados',
+                    ctaText: 'Con la app de alimentación personalizada INFIT y el plan correcto, puedes bajar de grasa y mejorar tu salud de forma sostenible. <strong class="text-infit-gold">Opción a L-Carnitina para potenciar la quema de grasa.</strong> ¡No estás sol' + (g === 'F' ? 'a' : 'o') + ', pide informes y logra tu mejor versión!'
+                },
+                obesidad1: {
+                    label: 'Obesidad Grado I',
+                    description: (g) => `Tu IMC indica obesidad grado I. Es importante tomar acción, pero <span class="text-orange-400 font-bold">cada paso cuenta y la transformación es posible</span>. Un plan de nutrición personalizado, adaptado a tus gustos y necesidades, es el primer paso real hacia tu mejor versión.`,
+                    ctaTitle: 'Tu salud es prioridad',
+                    ctaText: 'Con la app de alimentación personalizada INFIT y el acompañamiento correcto, la transformación es completamente posible. <strong class="text-infit-gold">Opción a L-Carnitina para potenciar tu proceso de quema de grasa.</strong> Da el primer paso hoy y alcanza tu mejor versión.'
+                },
+                obesidad2: {
+                    label: 'Obesidad Grado II',
+                    description: (g) => `Tu IMC indica obesidad grado II. Es crucial tomar acción para cuidar tu salud. <span class="text-red-400 font-bold">No es tarde para empezar</span> — con el plan correcto, la disciplina y el apoyo adecuado, muchas personas han logrado transformaciones increíbles.`,
+                    ctaTitle: 'Empieza hoy, tu futuro te lo agradecerá',
+                    ctaText: 'Con la app de alimentación personalizada INFIT y el acompañamiento que necesitas, puedes transformar tu salud. <strong class="text-infit-gold">Opción a L-Carnitina como aliado para potenciar tus resultados.</strong> Estamos aquí para ti. ¡Pide informes y logra tu mejor versión!'
+                },
+                obesidad3: {
+                    label: 'Obesidad Grado III',
+                    description: (g) => `Tu IMC indica obesidad grado III. Es muy importante cuidar tu salud y <span class="text-red-500 font-bold">buscar apoyo profesional es el mejor regalo que puedes darte</span>. Un plan de nutrición personalizado es el primer paso para tomar control de tu bienestar.`,
+                    ctaTitle: 'Tu transformación empieza con una decisión',
+                    ctaText: 'No estás sol' + (g === 'F' ? 'a' : 'o') + '. Con la app de alimentación personalizada INFIT y el acompañamiento correcto, puedes iniciar un cambio real en tu vida. <strong class="text-infit-gold">Opción a L-Carnitina para apoyar tu proceso.</strong> Da el primer paso hoy y alcanza tu mejor versión.'
+                }
+            };
+            return info[category];
+        }
+
+        // ==========================================
+        //  WHATSAPP CONTACT (functional message)
+        // ==========================================
+        function contactWhatsApp(region) {
+            const name = document.getElementById('user-name').value.trim() || 'No proporcionado';
+            const gender = selectedGender || '?';
+            const age = document.getElementById('user-age').value || '?';
+            const referrer = document.getElementById('user-referrer').value.trim();
+
+            let regionLabel = '';
+            let regionEmoji = '';
+            if (region === 'santa-ana') {
+                regionLabel = 'Santa Ana Hueytlalpan (Local)';
+                regionEmoji = '📍';
+            } else if (region === 'mexico') {
+                regionLabel = 'México General';
+                regionEmoji = '🇲🇽';
+            } else if (region === 'usa') {
+                regionLabel = 'Paisanos en EE.UU.';
+                regionEmoji = '🇺🇸';
+            }
+
+            const genderText = gender === 'F' ? 'Mujer' : gender === 'M' ? 'Hombre' : 'No especificado';
+            const bmiText = bmiResult ? `Mi IMC: ${bmiResult} (${getCategoryInfo(bmiCategory).label})` : '';
+
+            const phone = "527751056744";
+            
+            // Build message in plain text (WhatsApp will format with line breaks)
+            let message = `Hola INFIT! Soy ${name} y acabo de calcular mi IMC.\n\n`;
+            message += `Género: ${genderText}\n`;
+            message += `Edad: ${age} años\n`;
+            if (bmiText) message += `${bmiText}\n`;
+            message += `\n${regionEmoji} Región: ${regionLabel}\n\n`;
+            message += `Me interesa conocer más sobre los planes de nutrición para lograr mi mejor versión.`;
+            if (referrer) message += `\n\nRecomendado por: ${referrer}`;
+            if (affiliateCode) message += `\n(Asesor: ${affiliateCode})`;
+
+            const waLink = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+
+            // Try to save lead to Firebase before redirecting (non-blocking)
+            try {
+                if (db) {
+                    db.collection('artifacts').doc(appId).collection('public').doc('data')
+                      .collection('leads').add({
+                        name: name,
+                        gender: genderText,
+                        age: age,
+                        bmi: bmiResult || null,
+                        bmiCategory: bmiCategory || null,
+                        region: regionLabel,
+                        referrer: referrer || null,
+                        affiliate: affiliateCode || null,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                        source: 'imc-calculadora'
+                      }).catch(e => console.warn('Firebase save error:', e));
+                }
+            } catch(e) { /* ignore */ }
+
+            // Open WhatsApp — multiple fallback methods for maximum compatibility
+            // Method 1: window.open (works best on hosted pages like GitHub Pages)
+            const newWindow = window.open(waLink, '_blank');
+            
+            // Method 2: If popup blocked, use <a> click method
+            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+                const a = document.createElement('a');
+                a.href = waLink;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        }
+    </script>
+</body>
+</html>
