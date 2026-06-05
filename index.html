@@ -627,7 +627,7 @@
                         <span>Opción L-Carnitina para potenciar</span>
                     </li>
                 </ul>
-                <button onclick="contactWhatsApp('santa-ana')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)]">
+                <button onclick="contactWhatsApp('santa-ana')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)] cursor-pointer border-none">
                     <i class="fab fa-whatsapp text-lg"></i> Pide informes ahora
                 </button>
             </div>
@@ -660,7 +660,7 @@
                         <span>Opción L-Carnitina para potenciar</span>
                     </li>
                 </ul>
-                <button onclick="contactWhatsApp('mexico')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)]">
+                <button onclick="contactWhatsApp('mexico')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)] cursor-pointer border-none">
                     <i class="fab fa-whatsapp text-lg"></i> Pide informes ahora
                 </button>
             </div>
@@ -705,7 +705,7 @@
                     <span>Opción L-Carnitina para potenciar</span>
                 </li>
             </ul>
-            <button onclick="contactWhatsApp('usa')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)]">
+            <button onclick="contactWhatsApp('usa')" class="wa-btn w-full bg-[#25D366] text-white font-bold py-3.5 rounded-lg uppercase tracking-wider text-xs hover:bg-[#20bd5a] transition-colors flex justify-center items-center gap-2 shadow-[0_0_15px_rgba(37,211,102,0.25)] cursor-pointer border-none">
                 <i class="fab fa-whatsapp text-lg"></i> Pide informes ahora
             </button>
         </div>
@@ -751,6 +751,20 @@
             </div>
         </div>
     </section>
+
+    <!-- Success Overlay (igual que combos) -->
+    <div id="success-overlay" class="fixed inset-0 z-[110] hidden bg-black flex flex-col items-center justify-center p-4 text-center">
+        <div class="bg-infit-gold/10 p-6 rounded-full mb-6 animate-bounce">
+            <i class="fas fa-check text-4xl text-infit-gold"></i>
+        </div>
+        <h2 class="text-3xl font-heading font-bold text-white uppercase italic mb-2">¡Todo Listo!</h2>
+        <p class="text-gray-400 max-w-md mb-8">
+            Gracias <span id="success-name" class="text-infit-gold font-bold"></span>.
+            <br>
+            Hemos abierto WhatsApp para que confirmes tu interés.
+        </p>
+        <button onclick="location.reload()" class="text-gray-500 hover:text-white underline text-xs">Volver al inicio</button>
+    </div>
 
     <!-- Footer -->
     <footer class="bg-black py-8 border-t border-gray-900 mt-auto">
@@ -1170,7 +1184,9 @@
         }
 
         // ==========================================
-        //  WHATSAPP CONTACT (functional message)
+        //  WHATSAPP CONTACT — MISMA ESTRUCTURA QUE COMBOS
+        //  Usa %0A manual (no \n), sin encodeURIComponent
+        //  window.open + success overlay + confetti
         // ==========================================
         function contactWhatsApp(region) {
             const name = document.getElementById('user-name').value.trim() || 'No proporcionado';
@@ -1192,23 +1208,9 @@
             }
 
             const genderText = gender === 'F' ? 'Mujer' : gender === 'M' ? 'Hombre' : 'No especificado';
-            const bmiText = bmiResult ? `Mi IMC: ${bmiResult} (${getCategoryInfo(bmiCategory).label})` : '';
+            const bmiLabel = bmiCategory ? getCategoryInfo(bmiCategory).label : '';
 
-            const phone = "527751056744";
-            
-            // Build message in plain text (WhatsApp will format with line breaks)
-            let message = `Hola INFIT! Soy ${name} y acabo de calcular mi IMC.\n\n`;
-            message += `Género: ${genderText}\n`;
-            message += `Edad: ${age} años\n`;
-            if (bmiText) message += `${bmiText}\n`;
-            message += `\n${regionEmoji} Región: ${regionLabel}\n\n`;
-            message += `Me interesa conocer más sobre los planes de nutrición para lograr mi mejor versión.`;
-            if (referrer) message += `\n\nRecomendado por: ${referrer}`;
-            if (affiliateCode) message += `\n(Asesor: ${affiliateCode})`;
-
-            const waLink = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-
-            // Try to save lead to Firebase before redirecting (non-blocking)
+            // Save lead to Firebase (non-blocking)
             try {
                 if (db) {
                     db.collection('artifacts').doc(appId).collection('public').doc('data')
@@ -1227,20 +1229,47 @@
                 }
             } catch(e) { /* ignore */ }
 
-            // Open WhatsApp — multiple fallback methods for maximum compatibility
-            // Method 1: window.open (works best on hosted pages like GitHub Pages)
-            const newWindow = window.open(waLink, '_blank');
-            
-            // Method 2: If popup blocked, use <a> click method
-            if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-                const a = document.createElement('a');
-                a.href = waLink;
-                a.target = '_blank';
-                a.rel = 'noopener noreferrer';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            }
+            // =============================================
+            //  MISMA ESTRUCTURA QUE LOS COMBOS
+            //  %0A = salto de línea en URL
+            //  Sin encodeURIComponent — texto directo en URL
+            // =============================================
+            const phone = "527751056744";
+
+            const header = `Hola INFIT! 🚀 Soy *${name}* y acabo de calcular mi IMC.`;
+            const bmiText = bmiResult ? `%0A%0A📊 *MI IMC: ${bmiResult} (${bmiLabel})*` : '';
+            const details = `%0A%0A👤 *DATOS*%0A• Género: ${genderText}%0A• Edad: ${age} años`;
+            const regionSection = `%0A%0A${regionEmoji} *Región:* ${regionLabel}`;
+            const interest = `%0A%0A💪 Me interesa conocer más sobre los planes de nutrición para lograr mi mejor versión.`;
+            const refText = referrer ? `%0A%0A❤️ *RECOMENDADO POR*%0A• ${referrer}` : '';
+            const affiliateText = affiliateCode ? `%0A%0A(Asesor: ${affiliateCode})` : '';
+            const motivation = `%0A%0A✨ *¡Bienvenido a tu mejor Versión!*`;
+
+            const fullText = `${header}${bmiText}${details}${regionSection}${interest}${refText}${affiliateText}${motivation}`;
+            const waLink = `https://wa.me/${phone}?text=${fullText}`;
+
+            // Abrir WhatsApp (igual que combos)
+            window.open(waLink, '_blank');
+
+            // Mostrar success overlay (igual que combos)
+            showSuccess(name);
+        }
+
+        function showSuccess(name) {
+            const overlay = document.getElementById('success-overlay');
+            document.getElementById('success-name').textContent = name;
+            overlay.classList.remove('hidden');
+
+            // Confetti
+            try {
+                const end = Date.now() + 2.5 * 1000;
+                const colors = ['#FFD700', '#ffffff', '#FFD700'];
+                (function frame() {
+                    canvasConfetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors: colors });
+                    canvasConfetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors: colors });
+                    if (Date.now() < end) requestAnimationFrame(frame);
+                })();
+            } catch(e) { /* confetti optional */ }
         }
     </script>
 </body>
